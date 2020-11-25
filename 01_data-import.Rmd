@@ -1,0 +1,16 @@
+---
+title: “01_data-import”
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{bash}
+wget https://mothur.s3.us-east-2.amazonaws.com/wiki/miseqsopdata.zip
+```
+
+```{bash}
+unzip miseqsopdata.zip
+```
