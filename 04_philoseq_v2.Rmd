@@ -1,3 +1,9 @@
+---
+title: "Philoseq"
+output: html_notebook
+---
+
+
 ```{r}
 ps_connect <-url("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/ps.rds")
 ps = readRDS(ps_connect)
