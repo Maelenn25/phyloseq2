@@ -5,6 +5,7 @@ output: html_notebook
 ```{r}
 library("dada2")
 ```
+
 ```{r}
 path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
 list.files(path)
@@ -22,6 +23,7 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```{r}
 plotQualityProfile(fnRs[1:4])
 ```
+
 ```{r}
 # Place filtered files in filtered/ subdirectory
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
@@ -36,15 +38,19 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
               compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
 head(out)
 ```
+
 ```{r}
 errF <- learnErrors(filtFs, multithread=TRUE)
 ```
+
 ```{r}
 errR <- learnErrors(filtRs, multithread=TRUE)
 ```
+
 ```{r}
 plotErrors(errF, nominalQ=TRUE)
 ```
+
 ```{r}
 dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 ```
@@ -53,9 +59,11 @@ dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 ```{r}
 dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
 ```
+
 ```{r}
 dadaFs[[1]]
 ```
+
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
 # Inspect the merger data.frame from the first sample
@@ -66,14 +74,17 @@ head(mergers[[1]])
 seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
 ```
+
 ```{r}
 # Inspect distribution of sequence lengths
 table(nchar(getSequences(seqtab)))
 ```
+
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
+
 ```{r}
 1-sum(seqtab.nochim)/sum(seqtab)
 ```
@@ -86,18 +97,6 @@ track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, 
 colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
 rownames(track) <- sample.names
 head(track)
-```
-```{bash}
-wget https://zenodo.org/record/3986799/files/silva_nr99_v138_train_set.fa.gz
-```
-```{r}
-taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
-
-```
-```{r}
-taxa.print <- taxa # Removing sequence rownames for display only
-rownames(taxa.print) <- NULL
-head(taxa.print)
 ```
 
 ```{bash}
@@ -125,19 +124,9 @@ mock.ref <- getSequences(file.path(path, "HMP_MOCK.v35.fasta"))
 match.ref <- sum(sapply(names(unqs.mock), function(x) any(grepl(x, mock.ref))))
 cat("Of those,", sum(match.ref), "were exact matches to the expected reference sequences.\n")
 ```
-```{bash}
-sudo apt-get install -y libglpk-dev
-```
 
 ```{r}
-BiocManager::install("phyloseq")
-```
-```{r}
-ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
-               sample_data(samdf), 
-               tax_table(taxTab),phy_tree(fitGTR$tree))
-ps <- prune_samples(sample_names(ps) != "Mock", ps) # Remove mock sample
-ps
+save.image(file="03_DADA2_tutorial_FinalEnv")
 ```
 
 
