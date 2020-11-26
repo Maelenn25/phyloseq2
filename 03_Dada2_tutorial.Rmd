@@ -1,6 +1,9 @@
 ---
 title: "Dada2 tutorial"
-output: html_notebook
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 # Préparation de l'environnement
 ## Chargement des librairies Phyloseq et Dada2 afin de pouvoir utiliser ses packages
@@ -9,7 +12,7 @@ library ("phyloseq")
 library("dada2")
 ```
 
-## Création d'une variable 'path' dans laquelle on mets l'objet "Miseq_SOP". Ensuite on les liste
+## Création d'une variable 'path' dans laquelle on met l'objet "Miseq_SOP". Ensuite on les liste
 ```{r}
 path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
 list.files(path)
@@ -23,7 +26,7 @@ fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```
 
-# Inspect read quality profiles
+#Inspect read quality profiles
 ## Permet d'inspecter la qualité des différents reads et nous permet de voir à partir de quel nucléotide nous allons avoir une baisse du score de qualité pour pouvoir par la suite retirer les nucléotides de mauvaise qualité. Sur les forwards nous allons retirer les 10 derniers nucléotides avec une commande retrouvée plus bas dans le script. 
 ```{r}
 plotQualityProfile(fnRs[1:4])
@@ -32,7 +35,7 @@ plotQualityProfile(fnRs[1:4])
 ```{r}
 plotQualityProfile(fnRs[1:4])
 ```
-# Filter and trim
+#Filter and trim
 ## Ici nous créeons une nouvelle variable qui recevra tous les fichiers filtrés, que ce soit pour les Forwards ou les Reverses. Nous allons en même temps indiquer à la machine que les noms utilisés pour ranger les séquences dans les dossiers seront les mêmes que nous avons standardisé plus haut.
 ```{r}
 # Place filtered files in filtered/ subdirectory
@@ -49,7 +52,7 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
               compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
 head(out)
 ```
-# Learn the Error Rates
+#Learn the Error Rates
 ## Nous allons ici utiliser des lignes de commandes qui vont permettre d'apprendre à la machine les différents profils d'erreurs générées lors du séquençage. L'opération est faite sur les deux types de séquence.
 ```{r}
 errF <- learnErrors(filtFs, multithread=TRUE)
@@ -63,7 +66,7 @@ errR <- learnErrors(filtRs, multithread=TRUE)
 plotErrors(errF, nominalQ=TRUE)
 ```
 
-# Sample Inference
+#Sample Inference
 ## Ici nous créons une autre variable "dadaFs" dans laquelle nous mettons les fichiers obtenus après avoir filtré et appliqué le profil d'erreur à nos séquences. Nous allons faire la même chose avec dadaRS.
 ```{r}
 dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
@@ -75,14 +78,14 @@ dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
 ```{r}
 dadaFs[[1]]
 ```
-# Merge paired reads
+#Merge paired reads
 ## Ici nous voulons mettre en une seule séquence les Forwards et les Reverses.Nous pouvons faire cette opération grâce aux overlaps de 12 paires de base. Cela se fait grâce à un alignement entre les forwards et les reverses qui vont permettre de contruire les contigs.
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
 # Inspect the merger data.frame from the first sample
 head(mergers[[1]])
 ```
-# Construct sequence table
+#Construct sequence table
 ## Ici nous allons construire une table des variations de séquence dans les amplicons (ASV) qui permet une meilleure résolution que les tables OTUs 97%
 ```{r}
 seqtab <- makeSequenceTable(mergers)
@@ -93,7 +96,7 @@ dim(seqtab)
 table(nchar(getSequences(seqtab)))
 ```
 
-# Remove chimeras
+#Remove chimeras
 ## Malgré qu'on ait pu appliquer les modèles d'erreurs aux séquences, il reste des chimères. Ces chimères sont facilement reconnaissables par la machine et peuvent etre réparées en y rajoutant les parties droites et gauche des 2 séquences les plus abondantes.
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
@@ -105,7 +108,7 @@ dim(seqtab.nochim)
 ```
 
 
-# Track reads through the pipeline
+#Track reads through the pipeline
 ## Ce code nous permet de visualiser le nombre de séquences obtenues à la suite de toutes nos manipulations de filtrage. Ici nous pouvons voir qu'on a pu récupérer la plupart de nos séquences brutes, ce qui est signe d'une bonne qualité de séquençage.
 ```{r}
 getN <- function(x) sum(getUniques(x))
@@ -115,7 +118,7 @@ colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "n
 rownames(track) <- sample.names
 head(track)
 ```
-# Assign taxonomy
+#Assign taxonomy
 ## Ici nous avons du récupérer silva afin d'analyser et d'assigner les taxonomies.
 ```{bash}
 wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
@@ -123,27 +126,33 @@ wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
 ## Ici nous créons une variable qui va recevoir les espèces obtenues grâce à Silva
 
 ```{r}
-taxa <- addSpecies(taxa, "~/silva_species_assignment_v138.fa.gz")
+taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
 ```
 
+```{r}
+taxa <- addSpecies(taxa, "~/silva_species_assignment_v138.fa.gz")
+```
+## Ici on remarque donc après avoir affiché la table qu'on a créée on obtient une majorité de  Bacteroidetes ce qui est normal dans des échantillons fécaux. D'autres espèces n'ont pas pu être assignées car on a peu de données sur les bactéries des intestins des souris. 
 ```{r}
 taxa.print <- taxa # Removing sequence rownames for display only
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
 
+#Evaluate accuracy
+## Ici on cherche à comparer les variants donnés par la machine par rapport à la composition de communauté attendue. Le premier code nous montre qu'on s'attendait à avoir 20 souches différentes.
 ```{r}
 unqs.mock <- seqtab.nochim["Mock",]
 unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) # Drop ASVs absent in the Mock
 cat("DADA2 inferred", length(unqs.mock), "sample sequences present in the Mock community.\n")
 ```
-
+## Dada2 a indentifié 20 ASVs. Cela correspond précisement à ce à quoi on s'attendait, donc le taux d'erreur résiduel par dada2 est de 0%
 ```{r}
 mock.ref <- getSequences(file.path(path, "HMP_MOCK.v35.fasta"))
 match.ref <- sum(sapply(names(unqs.mock), function(x) any(grepl(x, mock.ref))))
 cat("Of those,", sum(match.ref), "were exact matches to the expected reference sequences.\n")
 ```
-
+#Sauvegarde de l'environnement pour pouvoir jouer le code de phyloseq
 ```{r}
 save.image(file="03_DADA2_tutorial_FinalEnv")
 ```
