@@ -40,6 +40,21 @@ BiocManager::install(.bioc_packages)
 install.packages("rmarkdown")
 ```
 
+```{bash}
+sudo apt-get install -y libglpk-dev
+```
+
+```{r}
+BiocManager::install("phyloseq")
+```
+
+```{r}
+ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
+               sample_data(samdf), 
+               tax_table(taxTab),phy_tree(fitGTR$tree))
+ps <- prune_samples(sample_names(ps) != "Mock", ps) # Remove mock sample
+ps
+```
 
 
 
