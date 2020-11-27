@@ -50,7 +50,7 @@ prevdf = data.frame(Prevalence = prevdf,
                     TotalAbundance = taxa_sums(ps),
                     tax_table(ps))
 ```
-Cette commande nous permet d'evaluer la moyenne des prévalences dans chaque phylum. Les résultats de cette commande nous montre que Fusobacteria est affilié à seulement 2 échantillons. Nous allons donc le retirer car il risque de nous gêner. C'est comme un bruit de fond.
+Cette commande nous permet d'evaluer la prévalence moyenne de chaque phylum (colonne1) et la prévalence totale (colonne2). Les résultats de cette commande nous montre que Fusobacteria est trouvée seulement 2 fois. idem pour deinococcus-thermus qui n'est retrouvé que dans un seul échantillon (même si au sein de cet echantillon nous l'y retrouvons 52 fois).Nous allons donc le retirer car il risque de nous gêner.
 ```{r}
 plyr::ddply(prevdf, "Phylum", function(df1){cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 ```
@@ -156,44 +156,27 @@ plotAfter = plot_abundance(ps3ra,"")
 grid.arrange(nrow = 1,  plotBefore, plotAfter)
 ```
 # Subset by taxonomy
-
+On remarque que les Lactobacillales apparaissent comme une distribution taxonomique bimodale. On va donc chercher à examiner les taxons du genre Lactobacillales pour expliquer cette répartition bimodale. Pour cela nous allons préciser le taxon dont nous voulons avoir le graphique.
+Lorsqu'on regarde les graphiques, on remarque les abondances relatives en fonction du sexe de l'hote sur lequelle les bactéries ont été prélevées.Ici il apparait donc clairement que la répartition bimodale de Lactobacillales provient Streptococcus (moins abondant) et de Lactobacillus qui a une abondance relative très élevée.
 ```{r}
 psOrd = subset_taxa(ps3ra, Order == "Lactobacillales")
 plot_abundance(psOrd, Facet = "Genus", Color = NULL)
 ```
-
-
-```{r}
-.cran_packages <- c( "shiny","miniUI", "caret", "pls", "e1071", "ggplot2", "randomForest", "dplyr", "ggrepel", "nlme", "devtools",
-                  "reshape2", "PMA", "structSSI", "ade4",
-                  "ggnetwork", "intergraph", "scales")
-.github_packages <- c("jfukuyama/phyloseqGraphTest")
-.bioc_packages <- c("genefilter", "impute")
-# Install CRAN packages (if not already installed)
-.inst <- .cran_packages %in% installed.packages()
-if (any(!.inst)){
-  install.packages(.cran_packages[!.inst],repos = "http://cran.rstudio.com/")
-}
-.inst <- .github_packages %in% installed.packages()
-if (any(!.inst)){
-  devtools::install_github(.github_packages[!.inst])
-}
-
-.inst <- .bioc_packages %in% installed.packages()
-if(any(!.inst)){
- Biocmanager::install(.bioc_packages[!.inst])
-}
-```
+# Preprocessing
+Nous allons ensuite vouloir analyser les données en utilisant des projections multivariées. La fonction ci-dessous va s'interesser à l'âge des souris sur lesquelles ont été prélevées les bactéries. Les souris vont donc être +/- agées. Nous allons compter le nombre d'echantillons pour chaque catégorie d'âge. ces comptages vont être convertis en logarithmes, ce qui va permettre de stabiliser la variance. On peut ainsi visualiser que l'âge permet de répartir les échantillons entre 3 clusters séparés, ce qui incite à construire une autre variable qui prenne en compte cela.
 
 ```{r}
 qplot(sample_data(ps)$age, geom = "histogram",binwidth=20) + xlab("age")
 ```
-
+Ici nous allons comparer les données brutes avec les données logarithmiques. Au vu des résultats, on peut interpreter que les variances sont suffisamment normalisées avec "log(1+x)" pour pouvoir explorer les abondances relatives.
+En réalité, pour d'autres analyses, cela ne sera pas suffisant. On recommande de plutot utiliser la fonction phyloseq_to_deseq2. 
 
 ```{r}
 qplot(log10(rowSums(otu_table(ps))),binwidth=0.2) +
   xlab("Logged counts-per-sample")
 ```
+# Première PcoA
+ce code nous permets de tracer une PcoA grâce à l'indice de dissimilarité de Bray-Curtis. On remarque que quelques échantillons sont à part. Ils correspondent d'après les auteurs aux femelles 5 et 6 du jour 165 et aux mâles 3,4,5 et 6 du jour 175. Nous pouvons voir le nom de ces échantillons en rejoutant label= "SampleID" dans l'objet "out.wuf.log", juste après "distance = "wunifrac"". Par soucis de clarté dans cette figure, j'ai décidé de ne pas le laisser.  Nous allons explorer la relation entre ces échantillons précis afin de pouvoir analyser ce qui les lient ensembles.
 ```{r}
 sample_data(ps)$age_binned <- cut(sample_data(ps)$age,
                           breaks = c(0, 100, 200, 400))
@@ -206,26 +189,30 @@ plot_ordination(pslog, out.wuf.log, color = "age_binned") +
   labs(col = "Binned Age") +
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
-
+Avec ce code, nous cherchons à analyser les deux femelles préalablement citées.Elles contiennent un même ASV qui qui a une forte abondance relative (90%). C'est la première fois qu'il y a une telle abondance car le reste du temps il a une abondance inférieure à 20%. De plus, sa diversité est la plus basse parmis tous les échantillons.
 ```{r}
 rel_abund <- t(apply(otu_table(ps), 1, function(x) x / sum(x)))
 qplot(rel_abund[, 12], geom = "histogram",binwidth=0.05) +
   xlab("Relative abundance")
 ```
-#Different Ordination Projections
+# Different Ordination Projections
+On va chercher à avoir des matrices de distance et différentes méthodes d'ordination qui vont nous permettre d'analyser les données. Nous allons donc retirer les "outliers" dans un premier temps, soit les échantillons qui avaient une dissimilarité forte par rapport au reste des échantillons.
 ```{r}
 outliers <- c("F5D165", "F6D165", "M3D175", "M4D175", "M5D175", "M6D175")
 ps <- prune_samples(!(sample_names(ps) %in% outliers), ps)
 ```
-# remove samples with fewer than 1000 reads
+De plus, nous retirons les échantillons qui contiennent moins de 1000 reads.
 ```{r}
 which(!rowSums(otu_table(ps)) > 1000)
 ```
+
 ```{r}
 ps <- prune_samples(rowSums(otu_table(ps)) > 1000, ps)
 pslog <- transform_sample_counts(ps, function(x) log(1 + x))
 ```
-# perform a PCoA using Bray-Curtis dissimilarity
+
+# Autres PcoA
+Nous allons demander à la machine de nous calculer une analyse par PcoA en utilisant l'indice de dissimilarité de Bray-Curtis. En regardant la figure obetnue, on peut clairement voir que l'age influence les communautés microbiennes retrouvées, avec une séparation vraiment nette entre les ASV des souris jeune et les souris d'âge moyen. Les souris plus agées semblent être retrouvées groupées avec les ASVs des souris moyennement agées. Si nous observons le second axe, nous pouvons trouver que les échantillons avec un plus grand score, ce qui correspond aux échantillons des souris moyennement agées et plus agées, sont les échantillons avec beaucoup de taxon appartenant aux Bacteroidetes avec un sous groupe de Firmicutes.
 ```{r}
 out.pcoa.log <- ordinate(pslog,  method = "MDS", distance = "bray")
 evals <- out.pcoa.log$values[,1]
@@ -235,6 +222,7 @@ plot_ordination(pslog, out.pcoa.log, color = "age_binned",
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 #double principal coordinates analysis (DPCoA)
+Cette PcoA est clairement dominée par l'axe 1, qui exprime 75% de variabilité, contre 8,5 sur l'Axe2. Cela est obtenu dû à l'ajout des informations phylogénétiques pour pouvoir générer cette PcoA.
 ```{r}
 out.dpcoa.log <- ordinate(pslog, method = "DPCoA")
 evals <- out.dpcoa.log$eig
@@ -243,14 +231,14 @@ plot_ordination(pslog, out.dpcoa.log, color = "age_binned", label= "SampleID",
   labs(col = "Binned Age", shape = "Litter")+
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
-#we have the first axis explains 75 % of the variability, about 9 times that of the second axis; this translates into the elongated form of the ordination plot.
-
+Nous allons donc chercher quel taxa est responsable de la PcoA juste au dessus. Pour cela nous allons faire un DPcoA, qui utilise l'abondance et les informations phylogénétiques contenues dans la classe phyloseq. L'objet final représente la distance patristique (somme des longueurs des branches qui joignent deux points) et cophenetique développée plus haut. Dans cette DPcoA, nous pouvons revoir que l'âge a un effet dans cette répartition. On peut y voir que quasiment tous les phylums représentés sur cette DPcoA sont ensembles, mis à part les Bactéroidetes qui sont assez dissimilaires au reste.  
 ```{r}
 plot_ordination(pslog, out.dpcoa.log, type = "species", color = "Phylum") +
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-#we see that the DPCoA gave a much cleaner interpretation of the second axis, compared to weighted Unifrac.
+Lorsqu'on reproduit la PCoA dominée par l'Axe 1 en utilisant unifrac comme indice de distance Unifrac, nous obtenons une PcoA beaucoup plus lisible.
+Grâce à ces exemples, on peut se rendre compte qu'il est important d'adapter sa technique de projection par rapport aux datas afin de mieux les visualiser.
 ```{r}
 out.wuf.log <- ordinate(pslog, method = "PCoA", distance ="wunifrac")
 evals <- out.wuf.log$values$Eigenvalues
@@ -260,11 +248,12 @@ plot_ordination(pslog, out.wuf.log, color = "age_binned",
   labs(col = "Binned Age", shape = "Litter")
 ```
 #PCA on ranks
+Création d'une matrice représentant l'abondance par son range, avec la bactérie la moins présente est mise au rang 1, puis la seconde moins présente est mise au rang 2, etc.
 ```{r}
 abund <- otu_table(pslog)
 abund_ranks <- t(apply(abund, 1, rank))
 ```
-
+Il faut faire attention car ces rangs peut renforcer les différences entre les rangs des taxons les plus représentés et les moins représentés. Pour éviter cela, toutes les bactéries qui seront sous la valeur seuil d'abondance seront mise à une valeur d'abondance de 1. Les rangs des autres bactéries seront alors décalées vers le bas afin d'eviter les gros écarts de rang. 
 ```{r}
 abund_ranks <- abund_ranks - 329
 abund_ranks[abund_ranks < 1] <- 1
@@ -290,7 +279,7 @@ ggplot(abund_df %>%
   scale_color_brewer(palette = "Set2")
 ```
 
-#PCA and study the resulting biplot, given in the Figure below. To produce annotation for this figure, we used the following block.
+Nous avons pu ordonner en rangs nos différentes abondances, nous allons ainsi pouvoir maintenant faire une PcoA grâce au code ci dessous.Nous retrouvons une dispersion similaire à celles trouvées dans les autres PcoA, ce qui nous permet d'être plutôt sûrs que ces données sont bien dûes aux séquences elles-mêmes qui sont donc fiables, qu'à notre moyen de projection qui pourrait influencer les interpretations de manière différente selon la projection choisie. Cela serait signe de mauvaises données car nous obtiendrions des résultats différents pour les mêmes séquences, ce qui n'est pas souhaitable.
 ```{r}
 library(ade4)
 ranks_pca <- dudi.pca(abund_ranks, scannf = F, nf = 3)
@@ -320,14 +309,18 @@ ggplot() +
   guides(col = guide_legend(override.aes = list(size = 3))) +
   labs(x = sprintf("Axis1 [%s%% variance]", round(evals_prop[1], 2)),
        y = sprintf("Axis2 [%s%% variance]", round(evals_prop[2], 2))) +
-  coord_fixed(sqrt(ranks_pca$eig[2] / ranks_pca$eig[1])) +
+  coord_fixed(sqrt(10*ranks_pca$eig[2] / ranks_pca$eig[1])) +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
-#Canonical correspondence
+# Canonical correspondence
+Les Canonical Correspondence Analysis (CCpnA) sont des ordinations en utilisant des tables d'echantillonage qui permettent d'incorporer des informations supplémentaires, comme l'age, les litières des souris, etc.
+Les positions des échantillons sont déterminés par similarité dans les signatures d'espèce et des caractéristiques environnementales.
+
+Le premier code spécifie un "extra-argument" qui permet de préciser les paramètres à utiliser pour faire l'ordination.
 ```{r}
 ps_ccpna <- ordinate(pslog, "CCA", formula = pslog ~ age_binned + family_relationship)
 ```
-
+ici nous décidons de joindre les différents scores avec les données environnementales. Parmis les 23 différents taxons, on décide d'annoter seulement les 4 les plus abondants qui permet de rendre le graphique plus lisible. 
 ```{r}
 library(ggrepel)
 ps_scores <- vegan::scores(ps_ccpna)
