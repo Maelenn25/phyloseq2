@@ -80,6 +80,7 @@ on va donc fixer un seuil de prévalence de 5%, c'est-à- dire que nous allons r
 prevalenceThreshold = 0.05 * nsamples(ps)
 prevalenceThreshold
 ```
+C'est grâce à la fonction prune_taxa qu'on va pouvoir retirer les ASVs qui ne respectent pas le seuil de prévalence
 ```{r}
 # Execute prevalence filter, using `prune_taxa()` function
 keepTaxa = rownames(prevdf1)[(prevdf1$Prevalence >= prevalenceThreshold)]
@@ -87,24 +88,22 @@ ps2 = prune_taxa(keepTaxa, ps)
 ```
 
 # Agglomerate taxa
-
+on sait que les communautés microbiennes sont souvent composées de taxons qui partagent des caractéristiques communes. On va donc chercher à mettre ensemble les taxons qui sont très proches les uns de autres.
+Pour cela, l'aggregation taxonomique est pratique. Elle est facile, et on peut comparer les taxons grâce à des arbres simples à rangs. Pour le generer on va pouvoir utiliser phyloseq. La première chose qui sera faite sera d'agglomerer ensemble les échantillons du même genre. 
 ```{r}
 # How many genera would be present after filtering?
 length(get_taxa_unique(ps2, taxonomic.rank = "Genus"))
 ```
-
-# Agglomerate taxa
-
-
+tax_glom est une fonction qui permet de rassembler les espèces ayant une taxonomie proche. On va donc mettre ces séquences là dans l'objet "ps3" qui va nous servir pour la construction de l'arbre.
 ```{r}
 ps3 = tax_glom(ps2, "Genus", NArm = TRUE)
 ```
-
+Tip_glom est une fonction analogue à tax_glom. Il nous permet de séparer les distances cophenetiques inférieures à une valeur h. La distance cophenetique est la distance entre deux objets dans l'arbre dont les branches comprennent deux objets réduits en une branche. On va donc créer un objet ps4 qui portera cette caractéristique. 
 ```{r}
 h1 = 0.4
 ps4 = tip_glom(ps2, h = h1)
 ```
-
+ici phyloseq va comparer les datas originales par rapport à l'arbre obtenu après agglomeration taxonomiques et enfin à l'arbre après les agglomerations phylogéniques. Grâce à la fonction gridExtra, nous pourrons ainsi générer ces 3 objets en un.
 ```{r}
 multiPlotTitleTextSize = 15
 p2tree = plot_tree(ps2, method = "treeonly",
@@ -117,19 +116,17 @@ p3tree = plot_tree(ps3, method = "treeonly",
 p4tree = plot_tree(ps4, method = "treeonly",
                    ladderize = "left", title = "By Height") +
   theme(plot.title = element_text(size = multiPlotTitleTextSize))
-```
-
-```{r}
 library (gridExtra)
 gridExtra::grid.arrange
 ```
-
-
+Sur la gauche nous retrouvons l'arbre original, au milieu l'arbre généré par agglomération taxonomique et à droit l'arbre généré par aggrégation phylogénique. On peut voir que les deux agglomérations nous permettent de clarifier les arbres. De plus, les arbres obtenus avec les deux types d'agglomération sont assez ressemblant.
 ```{r}
 # group plots together
 grid.arrange(nrow = 1, p2tree, p3tree, p4tree)
 ```
-
+# Abundance value transformation
+on peut avoir besoin de transformer nos données pour pouvoir calculer des variances. 
+On va d'abord utiliser la fonction "plot_abundance" pour definir un graphique d'abondance relative. Cela va nous permettre de comparer facilement les différentes échelles et les distributions d'abondance avant de les transformer.
 ```{r}
 plot_abundance = function(physeq,title = "",
                           Facet = "Order", Color = "Phylum"){
@@ -146,18 +143,19 @@ plot_abundance = function(physeq,title = "",
     theme(legend.position="none")
 }
 ```
-
+la fonction "transform_sample_counts" pour transformer les dénombrements en leur fréquence par rapport à leurs abondances relatives.
 ```{r}
 # Transform to relative abundance. Save as new object.
 ps3ra = transform_sample_counts(ps3, function(x){x / sum(x)})
 ```
-
+On va donc pouvoir tracer le graphique des valeurs d'abondances avant et après transformation. On peut voir qu'après les transformations, les valeurs d'abondances relatives sont mieux réparties et permettent une lecture plus aisées des différents paramètres. 
 ```{r}
 plotBefore = plot_abundance(ps3,"")
 plotAfter = plot_abundance(ps3ra,"")
 # Combine each plot into one graphic.
 grid.arrange(nrow = 1,  plotBefore, plotAfter)
 ```
+# Subset by taxonomy
 
 ```{r}
 psOrd = subset_taxa(ps3ra, Order == "Lactobacillales")
