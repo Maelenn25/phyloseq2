@@ -1,22 +1,35 @@
 ---
 title: "Philoseq"
-output: html_notebook
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
-
+# Lecture de l'environnement de Dada2
 ```{r}
 load("03_DADA2_tutorial_FinalEnv")
 ```
 
+# Chargement des librairies
+```{r}
+library(phyloseq)
+library(Biostrings)
+library(ggplot2)
+theme_set(theme_bw())
+```
+# récupération des données du tutoriel
 ```{r}
 ps_connect <-url("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/ps.rds")
 ps = readRDS(ps_connect)
 ps
 ```
+# Taxonomic Filtering
 
 ```{r}
 # Show available ranks in the dataset
 rank_names(ps)
 ```
+
 ```{r}
 # Create table, number of features for each phyla
 table(tax_table(ps)[, "Phylum"], exclude = NULL)
@@ -48,11 +61,10 @@ filterPhyla = c("Fusobacteria", "Deinococcus-Thermus")
 ps1 = subset_taxa(ps, !Phylum %in% filterPhyla)
 ps1
 ```
+
 ```{r}
 library(ggplot2)
 ```
-
-
 
 ```{r}
 # Subset to the remaining phyla
@@ -63,6 +75,7 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(ps),color=Phylum)) +
   scale_x_log10() +  xlab("Total Abundance") + ylab("Prevalence [Frac. Samples]") +
   facet_wrap(~Phylum) + theme(legend.position="none")
 ```
+
 ```{r}
 # Define prevalence threshold as 5% of total samples
 prevalenceThreshold = 0.05 * nsamples(ps)
