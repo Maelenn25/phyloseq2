@@ -5,40 +5,41 @@ output:
     toc: true
     toc_depth: 2
 ---
-# Lecture de l'environnement de Dada2
+# Préparation du script
+## Lecture de l'environnement de Dada2
 ```{r}
 load("03_DADA2_tutorial_FinalEnv")
 ```
 
-# Chargement des librairies
+## Chargement des librairies
 ```{r}
 library(phyloseq)
 library(Biostrings)
 library(ggplot2)
 theme_set(theme_bw())
 ```
-# récupération des données du tutoriel
+## récupération des données du tutoriel
 ```{r}
 ps_connect <-url("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/ps.rds")
 ps = readRDS(ps_connect)
 ps
 ```
 # Taxonomic Filtering
-
+ Ces lignes de codes nous permettent de compter le nombre d'echantillons qu'on a pour chaque phylums.
 ```{r}
 # Show available ranks in the dataset
 rank_names(ps)
 ```
-
+Sur la table affichée, nous pouvons compter 6 échantillons qui n'ont pas de phyla defini. Cela peut etre dû à une mauvaise filtration : ce serait des artefacts.
 ```{r}
 # Create table, number of features for each phyla
 table(tax_table(ps)[, "Phylum"], exclude = NULL)
 ```
-
+ Ce code nous permet de nous assurer ques les séquences pour lesquelles les anotations sont ambigues vont bien être retirées.
 ```{r}
 ps <- subset_taxa(ps, !is.na(Phylum) & !Phylum %in% c("", "uncharacterized"))
 ```
-
+Ici nous allons mesurer la prévalence, qui sera dans le cadre de cette étude le nombre d'echantillons par taxon (avec au minimum un echantillon par taxon du coup)
 ```{r}
 # Compute prevalence of each feature, store as data.frame
 prevdf = apply(X = otu_table(ps),
@@ -49,7 +50,7 @@ prevdf = data.frame(Prevalence = prevdf,
                     TotalAbundance = taxa_sums(ps),
                     tax_table(ps))
 ```
-
+Cette commande nous permet d'evaluer la moyenne des prévalences dans chaque phylum. Les résultats de cette commande nous montre que Fusobacteria est affilié à seulement 2 échantillons. Nous allons donc le retirer car il risque de nous gêner. C'est comme un bruit de fond.
 ```{r}
 plyr::ddply(prevdf, "Phylum", function(df1){cbind(mean(df1$Prevalence),sum(df1$Prevalence))})
 ```
@@ -61,11 +62,9 @@ filterPhyla = c("Fusobacteria", "Deinococcus-Thermus")
 ps1 = subset_taxa(ps, !Phylum %in% filterPhyla)
 ps1
 ```
-
-```{r}
-library(ggplot2)
-```
-
+#Prevalence Filtering
+ Ces manipulations nous permettent de voir si nous avons manqué de voir des echantillons mal definis ou en tres faible quantité qui devraient etre retirés. On va aussi pouvoir avoir un aperçu des séquences qui sont rangées dans chaque features. 
+Ici; chaque point représente un taxa. Nous ne voyons pas de seuil de prévalence clairement établi ici. Nous avons donc des taxons assez stables. Néanmoins nous pouvons fixer manuelle le seuil de prévalence quelque part entre 0 et 10% (en verifiant qu'il n'y a pas d'impact non attendu sur la suite de l'étude)
 ```{r}
 # Subset to the remaining phyla
 prevdf1 = subset(prevdf, Phylum %in% get_taxa_unique(ps1, "Phylum"))
@@ -75,7 +74,7 @@ ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(ps),color=Phylum)) +
   scale_x_log10() +  xlab("Total Abundance") + ylab("Prevalence [Frac. Samples]") +
   facet_wrap(~Phylum) + theme(legend.position="none")
 ```
-
+on va donc fixer un seuil de prévalence de 5%, c'est-à- dire que nous allons retirer toutes les valeurs de prévalence inferieures à 95%.
 ```{r}
 # Define prevalence threshold as 5% of total samples
 prevalenceThreshold = 0.05 * nsamples(ps)
@@ -86,6 +85,8 @@ prevalenceThreshold
 keepTaxa = rownames(prevdf1)[(prevdf1$Prevalence >= prevalenceThreshold)]
 ps2 = prune_taxa(keepTaxa, ps)
 ```
+
+# Agglomerate taxa
 
 ```{r}
 # How many genera would be present after filtering?
