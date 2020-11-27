@@ -28,16 +28,16 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```
 
 # Inspect read quality profiles
-## Permet d'inspecter la qualité des différents reads et nous permet de voir à partir de quel nucléotide nous allons avoir une baisse du score de qualité pour pouvoir par la suite retirer les nucléotides de mauvaise qualité. Sur les forwards nous allons retirer les 10 derniers nucléotides avec une commande retrouvée plus bas dans le script. 
+Permet d'inspecter la qualité des différents reads et nous permet de voir à partir de quel nucléotide nous allons avoir une baisse du score de qualité pour pouvoir par la suite retirer les nucléotides de mauvaise qualité. Sur les forwards nous allons retirer les 10 derniers nucléotides avec une commande retrouvée plus bas dans le script. 
 ```{r}
 plotQualityProfile(fnRs[1:4])
 ```
-## Ici nous faisons la même manipulation mais avec les Reverses qui sont d'un peu moins bonne qualité que les Forwards, dû au sequençage avec Illumina.Ici, nous retirerons tous les nucléotides à partir du 160e
+Ici nous faisons la même manipulation mais avec les Reverses qui sont d'un peu moins bonne qualité que les Forwards, dû au sequençage avec Illumina.Ici, nous retirerons tous les nucléotides à partir du 160e
 ```{r}
 plotQualityProfile(fnRs[1:4])
 ```
 # Filter and trim
-## Ici nous créeons une nouvelle variable qui recevra tous les fichiers filtrés, que ce soit pour les Forwards ou les Reverses. Nous allons en même temps indiquer à la machine que les noms utilisés pour ranger les séquences dans les dossiers seront les mêmes que nous avons standardisé plus haut.
+Ici nous créeons une nouvelle variable qui recevra tous les fichiers filtrés, que ce soit pour les Forwards ou les Reverses. Nous allons en même temps indiquer à la machine que les noms utilisés pour ranger les séquences dans les dossiers seront les mêmes que nous avons standardisé plus haut.
 ```{r}
 # Place filtered files in filtered/ subdirectory
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
@@ -46,7 +46,7 @@ names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 ```
 
-# Nous allons indiquer à la machine quels paramètres nous allons utiliser pour filtrer les séquences avant de les ranger. On indique ainsi dans la première fonction les deux fichiers d'où les séquences viendront (fnFs et fnRs), puis le fichier où elles seront rangées (filtFs et filtRs crées juste au dessus). Enuite nous allons indiquer où couper pour les deux sortes de séquences. 
+Nous allons indiquer à la machine quels paramètres nous allons utiliser pour filtrer les séquences avant de les ranger. On indique ainsi dans la première fonction les deux fichiers d'où les séquences viendront (fnFs et fnRs), puis le fichier où elles seront rangées (filtFs et filtRs crées juste au dessus). Enuite nous allons indiquer où couper pour les deux sortes de séquences. 
 ```{r}
 out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
               maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
@@ -54,7 +54,7 @@ out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
 head(out)
 ```
 # Learn the Error Rates
-## Nous allons ici utiliser des lignes de commandes qui vont permettre d'apprendre à la machine les différents profils d'erreurs générées lors du séquençage. L'opération est faite sur les deux types de séquence.
+ Nous allons ici utiliser des lignes de commandes qui vont permettre d'apprendre à la machine les différents profils d'erreurs générées lors du séquençage. L'opération est faite sur les deux types de séquence.
 ```{r}
 errF <- learnErrors(filtFs, multithread=TRUE)
 ```
@@ -62,32 +62,32 @@ errF <- learnErrors(filtFs, multithread=TRUE)
 ```{r}
 errR <- learnErrors(filtRs, multithread=TRUE)
 ```
-## Cette ligne nous permet de visualiser les erreurs qu'on a fait apprendre à la machine
+Cette ligne nous permet de visualiser les erreurs qu'on a fait apprendre à la machine
 ```{r}
 plotErrors(errF, nominalQ=TRUE)
 ```
 
 # Sample Inference
-## Ici nous créons une autre variable "dadaFs" dans laquelle nous mettons les fichiers obtenus après avoir filtré et appliqué le profil d'erreur à nos séquences. Nous allons faire la même chose avec dadaRS.
+Ici nous créons une autre variable "dadaFs" dans laquelle nous mettons les fichiers obtenus après avoir filtré et appliqué le profil d'erreur à nos séquences. Nous allons faire la même chose avec dadaRS.
 ```{r}
 dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 ```
 ```{r}
 dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
 ```
-## Cette commande nous permet de visualiser le résultat global qu'on retrouve classé dans la liste dadaFs. Ils nous indiquent que sur les séquences on retrouve 128 séquences qui correspondent aux vrais variants, par rapport aux 1979 séquences. Ils nous indiquent aussi les diagnostiques de qualité.
+Cette commande nous permet de visualiser le résultat global qu'on retrouve classé dans la liste dadaFs. Ils nous indiquent que sur les séquences on retrouve 128 séquences qui correspondent aux vrais variants, par rapport aux 1979 séquences. Ils nous indiquent aussi les diagnostiques de qualité.
 ```{r}
 dadaFs[[1]]
 ```
 # Merge paired reads
-## Ici nous voulons mettre en une seule séquence les Forwards et les Reverses.Nous pouvons faire cette opération grâce aux overlaps de 12 paires de base. Cela se fait grâce à un alignement entre les forwards et les reverses qui vont permettre de contruire les contigs.
+Ici nous voulons mettre en une seule séquence les Forwards et les Reverses.Nous pouvons faire cette opération grâce aux overlaps de 12 paires de base. Cela se fait grâce à un alignement entre les forwards et les reverses qui vont permettre de contruire les contigs.
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
 # Inspect the merger data.frame from the first sample
 head(mergers[[1]])
 ```
 # Construct sequence table
-## Ici nous allons construire une table des variations de séquence dans les amplicons (ASV) qui permet une meilleure résolution que les tables OTUs 97%
+Nous allons construire une table des variations de séquence dans les amplicons (ASV) qui permet une meilleure résolution que les tables OTUs 97%
 ```{r}
 seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
@@ -98,19 +98,19 @@ table(nchar(getSequences(seqtab)))
 ```
 
 # Remove chimeras
-## Malgré qu'on ait pu appliquer les modèles d'erreurs aux séquences, il reste des chimères. Ces chimères sont facilement reconnaissables par la machine et peuvent etre réparées en y rajoutant les parties droites et gauche des 2 séquences les plus abondantes.
+Malgré qu'on ait pu appliquer les modèles d'erreurs aux séquences, il reste des chimères. Ces chimères sont facilement reconnaissables par la machine et peuvent etre réparées en y rajoutant les parties droites et gauche des 2 séquences les plus abondantes.
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
-## Ici on peut voir qu'on à 3% de séquences chimériques dans notre jeu de donnée.
+Ici on peut voir qu'on à 3% de séquences chimériques dans notre jeu de donnée.
 ```{r}
 1-sum(seqtab.nochim)/sum(seqtab)
 ```
 
 
 # Track reads through the pipeline
-## Ce code nous permet de visualiser le nombre de séquences obtenues à la suite de toutes nos manipulations de filtrage. Ici nous pouvons voir qu'on a pu récupérer la plupart de nos séquences brutes, ce qui est signe d'une bonne qualité de séquençage.
+Ce code nous permet de visualiser le nombre de séquences obtenues à la suite de toutes nos manipulations de filtrage. Ici nous pouvons voir qu'on a pu récupérer la plupart de nos séquences brutes, ce qui est signe d'une bonne qualité de séquençage.
 ```{r}
 getN <- function(x) sum(getUniques(x))
 track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
@@ -120,11 +120,11 @@ rownames(track) <- sample.names
 head(track)
 ```
 # Assign taxonomy
-## Ici nous avons du récupérer silva afin d'analyser et d'assigner les taxonomies.
+Ici nous avons du récupérer silva afin d'analyser et d'assigner les taxonomies.
 ```{bash}
 wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
 ```
-## Ici nous créons une variable qui va recevoir les espèces obtenues grâce à Silva
+Ici nous créons une variable qui va recevoir les espèces obtenues grâce à Silva
 
 ```{r}
 taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
@@ -133,7 +133,7 @@ taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multi
 ```{r}
 taxa <- addSpecies(taxa, "~/silva_species_assignment_v138.fa.gz")
 ```
-## Ici on remarque donc après avoir affiché la table qu'on a créée on obtient une majorité de  Bacteroidetes ce qui est normal dans des échantillons fécaux. D'autres espèces n'ont pas pu être assignées car on a peu de données sur les bactéries des intestins des souris. 
+On remarque donc après avoir affiché la table qu'on a créée on obtient une majorité de  Bacteroidetes ce qui est normal dans des échantillons fécaux. D'autres espèces n'ont pas pu être assignées car on a peu de données sur les bactéries des intestins des souris. 
 ```{r}
 taxa.print <- taxa # Removing sequence rownames for display only
 rownames(taxa.print) <- NULL
@@ -141,13 +141,13 @@ head(taxa.print)
 ```
 
 # Evaluate accuracy
-## Ici on cherche à comparer les variants donnés par la machine par rapport à la composition de communauté attendue. Le premier code nous montre qu'on s'attendait à avoir 20 souches différentes.
+Ici on cherche à comparer les variants donnés par la machine par rapport à la composition de communauté attendue. Le premier code nous montre qu'on s'attendait à avoir 20 souches différentes.
 ```{r}
 unqs.mock <- seqtab.nochim["Mock",]
 unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) # Drop ASVs absent in the Mock
 cat("DADA2 inferred", length(unqs.mock), "sample sequences present in the Mock community.\n")
 ```
-## Dada2 a indentifié 20 ASVs. Cela correspond précisement à ce à quoi on s'attendait, donc le taux d'erreur résiduel par dada2 est de 0%
+Dada2 a indentifié 20 ASVs. Cela correspond précisement à ce à quoi on s'attendait, donc le taux d'erreur résiduel par dada2 est de 0%
 ```{r}
 mock.ref <- getSequences(file.path(path, "HMP_MOCK.v35.fasta"))
 match.ref <- sum(sapply(names(unqs.mock), function(x) any(grepl(x, mock.ref))))
