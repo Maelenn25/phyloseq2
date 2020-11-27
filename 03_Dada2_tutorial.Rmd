@@ -17,7 +17,8 @@ library("dada2")
 path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
 list.files(path)
 ```
-## Création de deux listes. Une avec les Forwards et une avec les Reverses qui correspondent respectivement au Read1 et Read2. La commande avec 'sample.names' permet de mettre toutes les séquences sous un même format pour harmoniser leurs noms.
+## Création de deux listes. 
+Une avec les Forwards et une avec les Reverses qui correspondent respectivement au Read1 et Read2. La commande avec 'sample.names' permet de mettre toutes les séquences sous un même format pour harmoniser leurs noms.
 ```{r}
 # Forward and reverse fastq filenames have format: SAMPLENAME_R1_001.fastq and SAMPLENAME_R2_001.fastq
 fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
