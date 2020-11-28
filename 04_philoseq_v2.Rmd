@@ -313,7 +313,7 @@ ggplot() +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
 # Canonical correspondence
-Les Canonical Correspondence Analysis (CCpnA) sont des ordinations en utilisant des tables d'echantillonage qui permettent d'incorporer des informations supplémentaires, comme l'age, les litières des souris, etc.
+Les Canonical Correspondence Analysis (CCpnA) sont des ordinations en utilisant des tables d'echantillonage qui permettent d'incorporer des informations supplémentaires, comme l'age, les liens de parenté entre les souris, etc.
 Les positions des échantillons sont déterminés par similarité dans les signatures d'espèce et des caractéristiques environnementales.
 
 Le premier code spécifie un "extra-argument" qui permet de préciser les paramètres à utiliser pour faire l'ordination.
@@ -446,7 +446,7 @@ ggplot(maxImpDF) +   geom_histogram(aes(x = abund)) +
 # Graph-based analyses
 ## Creating and plotting graphs
 Nous pouvons créer, grâce à phyloseq, une matrice de distance basée sur le seuil. Le réseau en résultant peut etre visualisé grâce au package "ggnetwork".  Grâce aux fonction ggplot et igraph, nous pouvons organiser l'analyse en reseau. On va pouvoir également ajouter des couleurs selon nos noeuds grâce à igraph. Dans notre cas, nous choisissons de baser le seuil sur l'indice de dissimilarité de jaccard, en prenant une valeur seuil de 0,35. On ajoute ensuite dans indications pour savoir de quelle souris provient l'echantillon. A la fin nous obtenons une analyse en reseau colorée en fonction de la provenance de l'echantillon (= sur quelle souris il a été prélevé) et en fonction de la litière utilisée (1 ou2). 
-ON peut voir sur l'analyse en reseau obtenue qu'on va avoir un regroupement des échantillons qui va former un noeud central assez dense, composé des échantillons des femelles 7 et males 1 et 2 majoritairement élevées sur la litière 1. GLobalement les litières forment des liaisons distinctes : les souris élevées sur la litière 1 seront plutôt regroupées ensembles et idem pour la litière 2. idem, les mâles auront tendance à être liés ensemble et les femelles ensembles aussi. On va donc ici pouvoir mettre en évidence que non seulement l'âge à un impact sur la communauté microbienne, mais aussi la litière utilisée et le sexe de l'individu.
+ON peut voir sur l'analyse en reseau obtenue qu'on va avoir un regroupement des échantillons qui va former un noeud central assez dense, composé des échantillons des femelles 7 et males 1 et 2 majoritairement élevées sur la litière 1. GLobalement les litières forment des liaisons distinctes : les souris élevées sur la litière 1 seront plutôt regroupées ensembles et idem pour la litière 2. idem, les mâles auront tendance à être liés ensemble et les femelles ensembles aussi. On va donc ici pouvoir mettre en évidence que non seulement l'âge à un impact sur la communauté microbienne, mais aussi la parenté entre les individus et le sexe de ceux ci.
 
 ```{r}
 library("phyloseqGraphTest")
@@ -465,7 +465,8 @@ ggplot(net_graph, aes(x = x, y = y, xend = xend, yend = yend), layout = "fruchte
   guides(col = guide_legend(override.aes = list(size = .5)))
 ```
 ## Minimum Spanning Tree (MST)
-They proposed the use of a minimum spanning tree (MST) based on the distances between the samples, and then counting the number of edges on the tree that were between samples in different groups. It is not necessary to use a minimum spanning tree (MST), the graph made by linking nearest neighbors (Schilling 1986) or distance thresholding can also be used as the input graph. No matter what graph we build between the samples, we can approximate a null distribution by permuting the labels of the nodes of the graph.
+Cette méthode d'analyse est basée sur les distances entre les échantillons, puis sur le dénombrement des bouts des branches qu'il y a entre ces échantillons dans les différents groupes. Pour modéliser l'arbre, cette méthode utilise les "nearest neighbors" ou une distance seuil établie. Ce qui compte à la fin c'est les noeuds finaux retouvés au bout des branches, et non l'arbre intermédiaire. Celui-ci sera changé en fonction de l'ordre des échantillons, mais comme la méthode est fiable, les bouts des branches avec les distances finales demeureront inchangés. 
+Dans notre premier code pour faire cet arbre nous utilisons l'indice de dissimilarité de Jaccard. Cet arbre aura pour but de verifier qu'au sein des mêm
 We first perform a test using an MST with Jaccard dissimilarity. We want to know whether the two litters (family_relationship) come from the same distribution. Since there is a grouping in the data by individual (host_subject_id), we can’t simply permute all the labels, we need to maintain this nested structure – this is what the grouping argument does. Here we permute the labels but keep the structure intact.
 ```{r}
 gt <- graph_perm_test(ps, "family_relationship", grouping = "host_subject_id",
