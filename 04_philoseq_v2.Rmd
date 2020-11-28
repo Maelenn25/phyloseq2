@@ -466,40 +466,38 @@ ggplot(net_graph, aes(x = x, y = y, xend = xend, yend = yend), layout = "fruchte
 ```
 ## Minimum Spanning Tree (MST)
 Cette méthode d'analyse est basée sur les distances entre les échantillons, puis sur le dénombrement des bouts des branches qu'il y a entre ces échantillons dans les différents groupes. Pour modéliser l'arbre, cette méthode utilise les "nearest neighbors" ou une distance seuil établie. Ce qui compte à la fin c'est les noeuds finaux retouvés au bout des branches, et non l'arbre intermédiaire. Celui-ci sera changé en fonction de l'ordre des échantillons, mais comme la méthode est fiable, les bouts des branches avec les distances finales demeureront inchangés. 
-Dans notre premier code pour faire cet arbre nous utilisons l'indice de dissimilarité de Jaccard. Cet arbre aura pour but de verifier qu'au sein des mêm
-We first perform a test using an MST with Jaccard dissimilarity. We want to know whether the two litters (family_relationship) come from the same distribution. Since there is a grouping in the data by individual (host_subject_id), we can’t simply permute all the labels, we need to maintain this nested structure – this is what the grouping argument does. Here we permute the labels but keep the structure intact.
+Dans notre premier code pour faire cet arbre nous utilisons l'indice de dissimilarité de Jaccard. Cet arbre aura pour but de verifier qu'au sein des mêmes portées nous retrouvons une distribution des abondances similaires. Ceci est traduit par l'argument "family_relationship". Par contre ici nous allons avoir besoin de maintenir ces structures imbriquées, nous ne pouvons pas les permuter simplement. C'est ce que fait l'argument "grouping". On va pouvoir faire ainsi des permutations mais en gardant cette structure intacte.
+
 ```{r}
 gt <- graph_perm_test(ps, "family_relationship", grouping = "host_subject_id",
                       distance = "jaccard", type = "mst")
 gt$pval
 ```
-
+On retrouve une faible p-value dans ce test où nous rejettons l'hypothèse nulle que les deux échantillons (et donc lignées) proviennent d'une même distribution. On peut voir grâce a notre figure que les échantillons sont beaucoup plus groupés par portée que ce qu'on aurait pu obtenir par hasard.
 ```{r}
 plotNet1=plot_test_network(gt) + theme(legend.text = element_text(size = 8),
         legend.title = element_text(size = 9))
 plotPerm1=plot_permutations(gt)
 grid.arrange(ncol = 2,  plotNet1, plotPerm1)
 ```
-#Nearest neighbors
+## Nearest neighbors
+Le graphique des voisins les plus proches permet de séparer les deux portées qui ne se retrouvent jamais mélangées l'une avec l'autre. Ainsi, lorsque deux points sont proches entre eux, on aura une forte probabilité qu'il appartiennent à la même lignée.
 ```{r}
 gt <- graph_perm_test(ps, "family_relationship", grouping = "host_subject_id",
                       distance = "jaccard", type = "knn", knn = 1)
 plotNet2=plot_test_network(gt) + theme(legend.text = element_text(size = 8),
         legend.title = element_text(size = 9))
 plotPerm2=plot_permutations(gt)
-grid.arrange(ncol = 2,  plotNet2, plotPerm2)
+grid.arrange(ncol = 1,  plotNet2, plotPerm2)
 ```
 
 
-#Linear modeling
-##We first compute the Shannon diversity associated with each sample and join it with sample annotation.
-```{r}
-library (nlme)
-```
+## Linear modeling
+It is often of interest to evaluate the degree to which microbial community diversity reflects characteristics of the environment from which it was sampled. Unlike ordination, the purpose of this analysis is not to develop a representation of many bacteria with respect to sample characteristics; rather, it is to describe how a single measure of overall community structure[^1] is associated with sample characteristics. This is a somewhat simpler statistical goal, and can be addressed through linear modeling, for which there are a range of approaches in R. As an example, we will used a mixed-effects model to study the relationship between mouse microbial community diversity and the age and litter variables that have been our focus so far. This choice was motivated by the observation that younger mice have noticeably lower Shannon diversities, but that different mice have different baseline diversities. The mixed-effects model is a starting point for formalizing this observation.
+
+We first compute the Shannon diversity associated with each sample and join it with sample annotation.
 
 ```{r}
-library("nlme")
-library("reshape2")
 library("nlme")
 library("reshape2")
 ps_alpha_div <- estimate_richness(ps, split = TRUE, measure = "Shannon")
