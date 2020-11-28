@@ -351,35 +351,45 @@ ggplot() +
 ```
 
 #Supervised learning
+L'apprentissage surpervisé des machines consiste à utiliser des algorithmes de R qui vont pouvoir choisir des paramètres de manière automatique. Nous avons vu avec les analyses précedantes que l'âge des souris influençait les communautés. Ici, grâce aux techniques d'apprentissage supervisé, nous allons essayer de prédire l'âge des souris par rapport aux communautés microbiennes retrouvées. 
+La première étape pour pouvoir faire cela sera donc de diviser les données en différents sets de tests avec les assignements donnés par souris (et non par echantillon) pour s'assurer que les différents tests simulent bien une collection de  nouvelles données.Nous allons suivre le modèle "Partial Least Squares" (PLS). Une fois ces données divisées, nous pouvons utiliser la fonction "train" pour coller le plus possible à notre modèle.
+Ici nous commençons par charger notre librairie pour éviter les messages d'erreur.
 ```{r}
 library (lattice)
 ```
-
+Créations des différents objets qui vont nous servir pour appliquer la méthode d'apprentissage supervisé.
 ```{r}
 library(caret)
 sample_data(pslog)$age2 <- cut(sample_data(pslog)$age, c(0, 100, 400))
 dataMatrix <- data.frame(age = sample_data(pslog)$age2, otu_table(pslog))
 # take 8 mice at random to be the training set, and the remaining 4 the test set
-trainingMice <- sample(unique(sample_data(pslog)$host_subject_id), size = 8)
+trainingMice <- sample(unique(sample_data(pslog)$host_subject_id), size = 3)
 inTrain <- which(sample_data(pslog)$host_subject_id %in% trainingMice)
 training <- dataMatrix[inTrain,]
 testing <- dataMatrix[-inTrain,]
 plsFit <- train(age ~ ., data = training,
                 method = "pls", preProc = "center")
 ```
-
+Ici nous utilisons la fonction "predict" dont nous allons comparer les résultats par rapport aux vraies données. On peut voir qu'il y a eu un peu d'erreur, et lorsqu'on rejoue les codes ci dessus et qu'on refait une simulation, on a de moins en moins d'erreurs. On peut donc voir que cette méthode est plutôt efficace. On remarque aussi que lorsqu'on réduit le nombre de souris par test, la méthode devient de plus en plus fine, faisant moins d'erreurs comparé au nombre d'echantillon.
+```{r}
+plsClasses <- predict(plsFit, newdata = testing)
+table(plsClasses, testing$age)
+```
+Ici nous allons quitter le modèle PLS pour appliquer le modèle random forests. Il utilise le même principe que PLS en switchant les données. J'ai rajouté une nouvelle demande de library pour ggplot2 afin d'éviter d'avoir des objets cachés. Au vu des résultats, on peut voir que c'est un modèle efficace, néanmoins il faut noter que quelques souris agées qui se sont retrouvées parmis les souris jeunes, avec un taux d'erreur legerement supérieur à celui de PLS.
 ```{r}
 library(randomForest)
+library (ggplot2)
 rfFit <- train(age ~ ., data = training, method = "rf",
                preProc = "center", proximity = TRUE)
 rfClasses <- predict(rfFit, newdata = testing)
 table(rfClasses, testing$age)
 ```
-# The code below extracts coordinates and supplies annotation for points to include on the PLS biplot.
+Pour pouvoir interpreter les résultats des deux modèles différents, nous allons génerer un biplot standard (pour PLS) et un graphique de proximité (random forests). Ce dernier consiste à utiliser des scores de proximité qui évalue une répartition dans l'espace. Le code ci-dessous nous permet, après avoir chargé la librairie "vegan", d'extraire les coordonnées et les annotations supplémentaires pour chaque points incluant le biplot PLS.
 ```{r}
+library(permute)
 library (vegan)
 ```
-
+Nous pouvons, sur le graphique obtenu, interpreter les résultats de la même façon que dans les précédantes ordinations, mais la projection choisie permet de mettre en évidence explicitement les variables d'âge regroupées. De plus, grâce à cette projection, nous pouvons identifier un espace qui va nous permettre de maximiser les discriminations selon les classes. Ainsi, nous pouvons utiliser des projections et des coefficients d'ASV qui permettent de respecter cet espace spécifique. 
 ```{r}
 pls_biplot <- list("loadings" = loadings(plsFit$finalModel),
                    "scores" = scores(plsFit$finalModel))
@@ -408,7 +418,7 @@ ggplot() +
   facet_grid( ~ age2) +
   theme(panel.border = element_rect(color = "#787878", fill = alpha("white", 0)))
 ```
-#PLS identifies a subspace to maximize discrimination between classes, and the biplot displays sample projections and ASV coefficients with respect to this subspace
+Ici nous allons donc génerer le graphique de proximité pour analyser les données de random forests. Nous calculons ici les distances entre les échantillons par rapport au nombre de fois où elle apparait dans le bootstrapping performé par random forests. Ainsi si on a une paire d'échantillons qui apparaissent souvent avec la même partition, alors cette paire aura une distance faible entre elle. Les distances finales sont placées dans une PCoA. Les séparations sont donc claires, et peuvent être comparées manuellement en observant les différents points. On peut donc se rendre compte selon le point qu'on aura des échantillons +/- faciles à classifier.
 ```{r}
 rf_prox <- cmdscale(1 - rfFit$finalModel$proximity) %>%
   data.frame(sample_data(pslog)[inTrain, ])
@@ -421,9 +431,11 @@ ggplot(rf_prox) +
   labs(col = "Binned Age", x = "Axis1", y = "Axis2")
 
 ```
+Pour ameiliorer notre compréhension du modèle random forests, on identifie la bactérie qui a le plus d'influence dans la prédiction. On peut voir apparaitre avec la premiere ligne de code que c'est Lachnospiraceae du genre Roseburia. Dans le graphique si dessous on va donc voir que cette batérie est très peu abondante chez les souris les plus jeunes, mais par contre elle aura une abondance plus importante chez les souris plus agées.
 ```{r}
 as.vector(tax_table(ps)[which.max(importance(rfFit$finalModel)), c("Family", "Genus")])
 ```
+
 ```{r}
 impOtu <- as.vector(otu_table(pslog)[,which.max(importance(rfFit$finalModel))])
 maxImpDF <- data.frame(sample_data(pslog), abund = impOtu)
@@ -431,7 +443,11 @@ ggplot(maxImpDF) +   geom_histogram(aes(x = abund)) +
   facet_grid(age2 ~ .) +
   labs(x = "Abundance of discriminative bacteria", y = "Number of samples")
 ```
-#Creating and plotting graphs
+# Graph-based analyses
+## Creating and plotting graphs
+Nous pouvons créer, grâce à phyloseq, une matrice de distance basée sur le seuil. Le réseau en résultant peut etre visualisé grâce au package "ggnetwork".  Grâce aux fonction ggplot et igraph, nous pouvons organiser l'analyse en reseau. On va pouvoir également ajouter des couleurs selon nos noeuds grâce à igraph. Dans notre cas, nous choisissons de baser le seuil sur l'indice de dissimilarité de jaccard, en prenant une valeur seuil de 0,35. On ajoute ensuite dans indications pour savoir de quelle souris provient l'echantillon. A la fin nous obtenons une analyse en reseau colorée en fonction de la provenance de l'echantillon (= sur quelle souris il a été prélevé) et en fonction de la litière utilisée (1 ou2). 
+ON peut voir sur l'analyse en reseau obtenue qu'on va avoir un regroupement des échantillons qui va former un noeud central assez dense, composé des échantillons des femelles 7 et males 1 et 2 majoritairement élevées sur la litière 1. GLobalement les litières forment des liaisons distinctes : les souris élevées sur la litière 1 seront plutôt regroupées ensembles et idem pour la litière 2. idem, les mâles auront tendance à être liés ensemble et les femelles ensembles aussi. On va donc ici pouvoir mettre en évidence que non seulement l'âge à un impact sur la communauté microbienne, mais aussi la litière utilisée et le sexe de l'individu.
+
 ```{r}
 library("phyloseqGraphTest")
 library("igraph")
@@ -448,12 +464,15 @@ ggplot(net_graph, aes(x = x, y = y, xend = xend, yend = yend), layout = "fruchte
         legend.key.height = unit(0.5,"line")) +
   guides(col = guide_legend(override.aes = list(size = .5)))
 ```
-#Minimum Spanning Tree (MST)
+## Minimum Spanning Tree (MST)
+They proposed the use of a minimum spanning tree (MST) based on the distances between the samples, and then counting the number of edges on the tree that were between samples in different groups. It is not necessary to use a minimum spanning tree (MST), the graph made by linking nearest neighbors (Schilling 1986) or distance thresholding can also be used as the input graph. No matter what graph we build between the samples, we can approximate a null distribution by permuting the labels of the nodes of the graph.
+We first perform a test using an MST with Jaccard dissimilarity. We want to know whether the two litters (family_relationship) come from the same distribution. Since there is a grouping in the data by individual (host_subject_id), we can’t simply permute all the labels, we need to maintain this nested structure – this is what the grouping argument does. Here we permute the labels but keep the structure intact.
 ```{r}
 gt <- graph_perm_test(ps, "family_relationship", grouping = "host_subject_id",
                       distance = "jaccard", type = "mst")
 gt$pval
 ```
+
 ```{r}
 plotNet1=plot_test_network(gt) + theme(legend.text = element_text(size = 8),
         legend.title = element_text(size = 9))
@@ -540,10 +559,12 @@ ps_samp <- sample_data(ps) %>%
 ```{bash}
 wget https://cran.r-project.org/src/contrib/Archive/structSSI/structSSI_1.1.1.tar.gz
 ```
+
 ```{r}
 library(devtools)
 install_local("./structSSI_1.1.1.tar.gz")
 ```
+
 ```{r}
 BiocManager::install("DESeq2")
 ```
@@ -591,6 +612,7 @@ ggplot(abund_sums) +
   facet_grid(type ~ .) +
   xlab("Total abundance within sample")
 ```
+
 ```{r}
 library("structSSI")
 el <- phy_tree(pslog)$edge
@@ -661,6 +683,7 @@ dim(metab)
 library(PMA)
 cca_res <- CCA(t(X),  t(metab), penaltyx = .15, penaltyz = .15)
 ```
+
 ```{r}
 cca_res
 ```
