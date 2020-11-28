@@ -556,11 +556,9 @@ ps_samp <- sample_data(ps) %>%
        value.name = "alpha_diversity")
 ```
 #Hierarchical multiple testing
-Hypothesis testing can be used to identify individual microbes whose abundance relates to sample variables of interest. A standard approach is to compute a test statistic for each bacteria individually, measuring its association with sample characteristics, and then jointly adjust p-values to ensure a False Discovery Rate upper bound. This can be accomplished through the Benjamini-Hochberg procedure, for example (Benjamini and Hochberg 1995). However, this procedure does not exploit any structure among the tested hypotheses – for example, it is likely that if one Ruminococcus species is strongly associated with age, then others are as well. To integrate this information, (Benjamini and Yekutieli 2003; Benjamini and Bogomolov 2014) proposed a hierarchical testing procedure, where taxonomic groups are only tested if higher levels are found to be be associated. In the case where many related species have a slight signal, this pooling of information can increase power.
-
-We apply this method to test the association between microbial abundance and age. This provides a complementary view of the earlier analyses, identifying individual bacteria that are responsible for the differences between young and old mice.
-
-We digress briefly from hierarchical testing to describe an alternative form of count normalization. Rather than working with the logged data as in our earlier analysis, we consider a variance stabilizing transformation introduced by (Love, Huber, and Anders 2014) for RNA-seq data and in (McMurdie and Holmes 2014) for 16S rRNA generated count data and available in the DESeq2 package. The two transformations yield similar sets of significant microbes. One difference is that, after accounting for size factors, the histogram of row sums for DESeq is more spread out in the lower values, refer to Figure 23. This is the motivation of using such a transformation, although for high abundance counts, it is equivalent to the log, for lower and mid range abundances it does not crush the data and yields more powerful results. The code below illustrates the mechanics of computing ’s variance stabilizing transformation on a object.
+Pour pouvoir compiler des tests performés sur des bactéries individuelles en exploitant en parallèle les structures au seins des hypothèses testées, comme par exmple dans notre cas qu'une espèce de Ruminococcus qui est etroitement corrélée à l'âge des souris, nous allons pouvoir utiliser une procédure de tests hierarchiques. Dans cette procédure, nous allons pouvoir tester les associations les plus représentées. Si nous nous trouvons dans une situation dans laquelle nous avons beaucoup d'espèces qui fournissent un signal léger, nous allons pouvoir rassembler ces informations pour pouvoir augmenter leur puissance. 
+Ce test va être particulièrement efficace pour tester les associations entre les abondances microbiennes et l'âge dans le cadre de notre étude. L'avantage ici sera de pouvoir identifier les bactéries spécifiques responsables de ces différences entre les âges. 
+Pour ce faire, nous allons ici travailler en considérant une stabilisation par transformation de la variance pour les données issues des sequences ARN 16S générées et disponibles dans le package DESeq2. C'est une autre méthode de normalisation qui sera plus adaptée à notre test. Nous obtiendrons quand meme une transformation avec des taux de significativité des bactéries importantes semblable aux autres analyses. L'histogramme nous donne le total des abondances transformées pour chaque échantillon. 
 
 ```{r}
 library("reshape2")
@@ -605,9 +603,11 @@ ggplot(abund_sums) +
   facet_grid(type ~ .) +
   xlab("Total abundance within sample")
 ```
-
+Ici nous utilisons un test hierarchique et non seulement un test avec des hypothèses multiples.
+Pour pouvoir être appliqué il aura donc besoin de faire des tests univariés pour chaque groupe taxonomique de niveau supérieur, et non pour seulement chaque espèce. Pour nous aider à faire cela nous pouvons utiliser la fonction " treePValues ", qui va encoder une liste avec les relations parentales qui constitue le premier noeud racine.
 ```{r}
 library("structSSI")
+library (phyloseq)
 el <- phy_tree(pslog)$edge
 el0 <- el
 el0 <- el0[nrow(el):1, ]
@@ -623,11 +623,10 @@ summary(hfdr_res)
 ```
 
 ```{r}
-#interactive part: not run
+#interactive part
 plot(hfdr_res, height = 5000) # opens in a browser
 ```
 
-#retrieve the taxonomic identity of the rejected hypotheses.
 ```{r}
 library(dplyr)
 library (phyloseq)
@@ -639,7 +638,7 @@ tax <- tax_table(pslog)[, c("Family", "Genus")] %>%
   data.frame()
 tax$seq <- short_names
 ```
-
+Grâce à ce code nous pouvons que la bactérie la plus associée appartient à la famille des Lachnospiraceae, ce qui correspond à ce qu'on avait obtenu pour les résultats de random forests.
 ```{r}
 options(digits=3)
 hfdr_res@p.vals$seq <- rownames(hfdr_res@p.vals)
@@ -647,15 +646,20 @@ tax %>%
   left_join(hfdr_res@p.vals) %>%
   arrange(adjp) %>% head(10)
 ```
-#Multitable techniques
-##Canonical Correlation Analysis
+# Multitable techniques
+Plusieurs études se basant sur les microbes vont avoir pour but de quantifier les variations génomiques et métaboliques selon les expérimentations. C'est pour ça qu'on va souvent pouvoir retrouver plusieurs expérimentations sur un même échantillon biologique. On pourra ainsi visualiser les changements de communautés, génétiques, métaboliques, etc. en rapport avec l'environnement. Tout dépend ce qu'on cherche à comprendre.
+Ici nous allons nous concentrer sur un workflow qui utilise les Analyses des Corrélations Canoniques. Ces analyses nous permettent de comparer deux groupes dont les variables quantitatives sont appliquées sur les mêmes individus. On va ainsi pouvoir comparer ces deux groupes de variable pour pouvoir voir si elles décrivent un même phénomène. Si cela est le cas, on pourra voir que les deux groupes fonctionnent de la même manière et donc qu'ils peuvent être considérés comme des réplicats.
+Ici nous utiliserons deux tables, une pour les bactéries et une autres pour les métabolites trouvés.
+La ligne de code ci-dessous nous permet de voir qu'on a 12 échantillons pour 20609 OTUs. On a en parallèle filtré les les données non conformes. 
+Nous avons aussi fait de "microbe" un objet phyloseq.
 ```{r}
 metab <- read.csv("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/metabolites.csv",row.names = 1)
 microbe_connect <-url("https://raw.githubusercontent.com/spholmes/F1000_workflow/master/data/microbe.rda")
 load(microbe_connect)
 microbe
 ```
-##filter down to microbes and metabolites of interest, removing those that are zero across many samples
+Nous filtrons les données qui nous interressent dans les deux tables, en enlevant celles pour lesquelles nous ne retrouvons rien dans la plupart des échantillons. Ensuite nous allons les transformer et récuperer les log des métabolites. 
+Nous allons obtenir une colonne par sample, puis nous allons pouvoir appliquer les Analyses des Corrélations Canoniques qui va nous permettre de prendre en compte les paramètres permettant d'obtenir la meilleure covariance. Ces paramètres permettent de refleter les signaux présents dans les tables multiples. C'est pour cela qu'ici nous ne faisons pas d'ordination. 
 ```{r}
 library("genefilter")
 keep_ix <- rowSums(metab == 0) <= 3
@@ -667,11 +671,14 @@ X <- otu_table(microbe)
 X[X > 50] <- 50
 dim(X)
 ```
-##the log of the metabolites
+
 ```{r}
 dim(metab)
 ```
-##The parameters penaltyx and penaltyz are sparsity penalties. Smaller values of penaltyx will result in fewer selected microbes, similarly penaltyz modulates the number of selected metabolites
+Nous allons utiliser une méthode de régularisation structurée de la rareté (Sparse estimation method). Ce sont des méthodes qui ont pour but d'obtenir des représentations parcimonieuses de nos données. 
+Pour cela nous utilisons les paramètres penaltyx et penaltyz. Une petite valeur de penaltyx va avoir comme conséquence la selection de moins de bactéries. Penaltyz va lui moduler les métabolites séléctionnés pour l'analyse. On va donc pouvoir les ajuster afin de faciliter l'interpretation des graphiques. On va d'ailleurs souvent preferer plus de dispersion que les parametres par defaut nous propose.
+Avec notre code ci-dessous, nous avons pu selectionner 5 bactéries et 15 métabolites qui permettent d'expliquer les covariations entre les tables. Ces 20 variables sont d'ailleurs corrélées à 0.974 entre les deux tables, montrant leur importance. De cette donnée, on peut interpreter que les données entre les deux tables possèdent des signaux sous-jacents identiques, et que ces signaux sont traduits approximativement par les 20 paramètres trouvés. En revanche, il faut faire attention à ne pas prendre ces resultats pour argent comptant. En effet nous ne sommes pas sûrs que ces données peuvent être étendues à d'autres sous-ensembles.   
+
 ```{r}
 library(PMA)
 cca_res <- CCA(t(X),  t(metab), penaltyx = .15, penaltyz = .15)
@@ -680,12 +687,12 @@ cca_res <- CCA(t(X),  t(metab), penaltyx = .15, penaltyz = .15)
 ```{r}
 cca_res
 ```
-##To relate the recovered metabolites and OTUs to characteristics of the samples on which they were measured, we use them as input to an ordinary PCA
-```{r}
-library(ade4)
-```
+Cependant,même si nous devons faire attention à ces résultats si nous voulons les étendre, dans nos deux tables nous savons qu'ils sont fiables. Ils vont donc nous permettre de reduire notre jeu de donnée sans subir de perte importantes pour comprendre les informations. 
+Pour relier les informations des metabolites et des ASV/OTUs, nous pouvont faire une simple PCA.
+Notre PCA ainsi obtenue est un triplot qui montre différents types d'echantillons et des signatures avec des domaines multiples, que ce soit pour les OTUs que pour les métabolites. Cette figure va donc nous permettre de faaire des comparaisons au travers des échantillons, et nous allons pouvoir caractériser l'influence des divers paramètres. Par exemple nous pouvons voir que les données varient selon le régime alimentaire des souris, ce qui est un résultat auquel on pouvait s'attendre. Ce type de graphique est utile ici car il nous permet d'eviter de regrouper des centaines de points, ce qui aurait rendu l'interpretation plus délicate. 
 
 ```{r}
+library(ade4)
 combined <- cbind(t(X[cca_res$u != 0, ]),
                   t(metab[cca_res$v != 0, ]))
 pca_res <- dudi.pca(combined, scannf = F, nf = 3)
@@ -705,9 +712,6 @@ feature_info <- data.frame(pca_res$c1,
 library(dplyr)
 library(ggplot2)
 library(ggrepel)
-```
-
-```{r}
 ggplot() +  geom_point(data = sample_info,
             aes(x = Axis1, y = Axis2, col = sample_type, shape = genotype), size = 3) + 
   geom_label_repel(data = feature_info,
@@ -727,17 +731,3 @@ ggplot() +  geom_point(data = sample_info,
                    100 * round(pca_res$eig[2] / sum(pca_res$eig), 2)),
        fill = "Feature Type", col = "Sample Type")
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
