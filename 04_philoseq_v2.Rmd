@@ -3,7 +3,7 @@ title: "Philoseq"
 output: 
   github_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
 ---
 # Préparation du script
 ## Lecture de l'environnement de Dada2
@@ -493,10 +493,11 @@ grid.arrange(ncol = 1,  plotNet2, plotPerm2)
 
 
 ## Linear modeling
-It is often of interest to evaluate the degree to which microbial community diversity reflects characteristics of the environment from which it was sampled. Unlike ordination, the purpose of this analysis is not to develop a representation of many bacteria with respect to sample characteristics; rather, it is to describe how a single measure of overall community structure[^1] is associated with sample characteristics. This is a somewhat simpler statistical goal, and can be addressed through linear modeling, for which there are a range of approaches in R. As an example, we will used a mixed-effects model to study the relationship between mouse microbial community diversity and the age and litter variables that have been our focus so far. This choice was motivated by the observation that younger mice have noticeably lower Shannon diversities, but that different mice have different baseline diversities. The mixed-effects model is a starting point for formalizing this observation.
-
-We first compute the Shannon diversity associated with each sample and join it with sample annotation.
-
+### Modèle mixte
+Pouvoir évaluer l'impacte de l'environnement dans lesquels les echantillons ont été prélevés est un autre moyen d'analyser des données. Ici on veut décrire comment une seule mesure par rapport à toutes les données peut être associée aux caractéristiques de l'échantillon. On va donc pouvoir obtenir cela grâce à la modelisation linéaire. Ici nous allons étudier cela en utilisant un modèle mixte. C'est un modèle qui utilise des effets fixes et aléatoires, ce qui permet de passer outre certaines mesures manquantes. Nous allons l'utiliser pour etudier la relation entre la diversité du microbiome d'une souris avec les variables d'âge et de portée qu'on a deja pu étudier au travers des autres analyses plus haut.
+Ce type d'étude sera pertinante car nous avons déjà pu observer que les souris jeunes avaient une diversité bien plus faible selon l'indice de Shannon. Les données obtenues vont nous permettre de visualiser tout ça. 
+On commence donc à associer l'indice de diversité de Shannon avec chaque échantillon pour les joindre avec les annotations des échantillons.
+On peut voir apparaitre ici clairement pour chaque souris, mâle ou femelle, la diversité de Shannon, en fonction de la portée dont elle provient.
 ```{r}
 library("nlme")
 library("reshape2")
@@ -555,18 +556,11 @@ ps_samp <- sample_data(ps) %>%
        value.name = "alpha_diversity")
 ```
 #Hierarchical multiple testing
-```{bash}
-wget https://cran.r-project.org/src/contrib/Archive/structSSI/structSSI_1.1.1.tar.gz
-```
+Hypothesis testing can be used to identify individual microbes whose abundance relates to sample variables of interest. A standard approach is to compute a test statistic for each bacteria individually, measuring its association with sample characteristics, and then jointly adjust p-values to ensure a False Discovery Rate upper bound. This can be accomplished through the Benjamini-Hochberg procedure, for example (Benjamini and Hochberg 1995). However, this procedure does not exploit any structure among the tested hypotheses – for example, it is likely that if one Ruminococcus species is strongly associated with age, then others are as well. To integrate this information, (Benjamini and Yekutieli 2003; Benjamini and Bogomolov 2014) proposed a hierarchical testing procedure, where taxonomic groups are only tested if higher levels are found to be be associated. In the case where many related species have a slight signal, this pooling of information can increase power.
 
-```{r}
-library(devtools)
-install_local("./structSSI_1.1.1.tar.gz")
-```
+We apply this method to test the association between microbial abundance and age. This provides a complementary view of the earlier analyses, identifying individual bacteria that are responsible for the differences between young and old mice.
 
-```{r}
-BiocManager::install("DESeq2")
-```
+We digress briefly from hierarchical testing to describe an alternative form of count normalization. Rather than working with the logged data as in our earlier analysis, we consider a variance stabilizing transformation introduced by (Love, Huber, and Anders 2014) for RNA-seq data and in (McMurdie and Holmes 2014) for 16S rRNA generated count data and available in the DESeq2 package. The two transformations yield similar sets of significant microbes. One difference is that, after accounting for size factors, the histogram of row sums for DESeq is more spread out in the lower values, refer to Figure 23. This is the motivation of using such a transformation, although for high abundance counts, it is equivalent to the log, for lower and mid range abundances it does not crush the data and yields more powerful results. The code below illustrates the mechanics of computing ’s variance stabilizing transformation on a object.
 
 ```{r}
 library("reshape2")
