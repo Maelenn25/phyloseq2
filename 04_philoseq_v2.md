@@ -8,10 +8,13 @@ Philoseq
       - [récupération des données du
         tutoriel](#récupération-des-données-du-tutoriel)
   - [Taxonomic Filtering](#taxonomic-filtering)
+  - [Prevalence Filtering](#prevalence-filtering)
   - [Agglomerate taxa](#agglomerate-taxa)
   - [Autres PcoA](#autres-pcoa)
+  - [Supervised learning](#supervised-learning)
       - [Linear modeling](#linear-modeling)
           - [Modèle mixte](#modèle-mixte)
+  - [Hierarchical multiple testing](#hierarchical-multiple-testing)
   - [Multitable techniques](#multitable-techniques)
 
 # Préparation du script
@@ -197,15 +200,16 @@ ps1
     ## tax_table()   Taxonomy Table:    [ 381 taxa by 6 taxonomic ranks ]
     ## phy_tree()    Phylogenetic Tree: [ 381 tips and 379 internal nodes ]
 
-\#Prevalence Filtering Ces manipulations nous permettent de voir si nous
-avons manqué de voir des echantillons mal definis ou en tres faible
-quantité qui devraient etre retirés. On va aussi pouvoir avoir un aperçu
-des séquences qui sont rangées dans chaque features. Ici; chaque point
-représente un taxa. Nous ne voyons pas de seuil de prévalence clairement
-établi ici. Nous avons donc des taxons assez stables. Néanmoins nous
-pouvons fixer manuelle le seuil de prévalence quelque part entre 0 et
-10% (en verifiant qu’il n’y a pas d’impact non attendu sur la suite de
-l’étude)
+# Prevalence Filtering
+
+Ces manipulations nous permettent de voir si nous avons manqué de voir
+des echantillons mal definis ou en tres faible quantité qui devraient
+etre retirés. On va aussi pouvoir avoir un aperçu des séquences qui sont
+rangées dans chaque features. Ici; chaque point représente un taxa. Nous
+ne voyons pas de seuil de prévalence clairement établi ici. Nous avons
+donc des taxons assez stables. Néanmoins nous pouvons fixer manuelle le
+seuil de prévalence quelque part entre 0 et 10% (en verifiant qu’il n’y
+a pas d’impact non attendu sur la suite de l’étude)
 
 ``` r
 # Subset to the remaining phyla
@@ -313,7 +317,7 @@ gridExtra::grid.arrange
     ##     grid.draw(g)
     ##     invisible(g)
     ## }
-    ## <bytecode: 0x55b2d8458008>
+    ## <bytecode: 0x5570b1dc6630>
     ## <environment: namespace:gridExtra>
 
 Sur la gauche nous retrouvons l’arbre original, au milieu l’arbre généré
@@ -511,16 +515,16 @@ plot_ordination(pslog, out.pcoa.log, color = "age_binned",
   coord_fixed(sqrt(evals[2] / evals[1]))
 ```
 
-![](04_philoseq_v2_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
-\#double principal coordinates analysis (DPCoA) Cette PcoA est
-clairement dominée par l’axe 1, qui exprime 75% de variabilité, contre
-8,5 sur l’Axe2. Cela est obtenu dû à l’ajout des informations
-phylogénétiques pour pouvoir générer cette PcoA.
+![](04_philoseq_v2_files/figure-gfm/unnamed-chunk-29-1.png)<!-- --> \#
+Double principal coordinates analysis (DPCoA) Cette PcoA est clairement
+dominée par l’axe 1, qui exprime 75% de variabilité, contre 8,5 sur
+l’Axe2. Cela est obtenu dû à l’ajout des informations phylogénétiques
+pour pouvoir générer cette PcoA.
 
 ``` r
 out.dpcoa.log <- ordinate(pslog, method = "DPCoA")
 evals <- out.dpcoa.log$eig
-plot_ordination(pslog, out.dpcoa.log, color = "age_binned", label= "SampleID",
+plot_ordination(pslog, out.dpcoa.log, color = "age_binned",
                   shape = "family_relationship") +
   labs(col = "Binned Age", shape = "Litter")+
   coord_fixed(sqrt(evals[2] / evals[1]))
@@ -566,8 +570,8 @@ plot_ordination(pslog, out.wuf.log, color = "age_binned",
   labs(col = "Binned Age", shape = "Litter")
 ```
 
-![](04_philoseq_v2_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
-\#PCA on ranks Création d’une matrice représentant l’abondance par son
+![](04_philoseq_v2_files/figure-gfm/unnamed-chunk-32-1.png)<!-- --> \#
+PCA on ranks Création d’une matrice représentant l’abondance par son
 range, avec la bactérie la moins présente est mise au rang 1, puis la
 seconde moins présente est mise au rang 2, etc.
 
@@ -792,18 +796,20 @@ ggplot() +
 
 ![](04_philoseq_v2_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
-\#Supervised learning L’apprentissage surpervisé des machines consiste à
-utiliser des algorithmes de R qui vont pouvoir choisir des paramètres de
-manière automatique. Nous avons vu avec les analyses précedantes que
-l’âge des souris influençait les communautés. Ici, grâce aux
-techniques d’apprentissage supervisé, nous allons essayer de prédire
-l’âge des souris par rapport aux communautés microbiennes retrouvées.
-La première étape pour pouvoir faire cela sera donc de diviser les
-données en différents sets de tests avec les assignements donnés par
-souris (et non par echantillon) pour s’assurer que les différents tests
-simulent bien une collection de nouvelles données.Nous allons suivre le
-modèle “Partial Least Squares” (PLS). Une fois ces données divisées,
-nous pouvons utiliser la fonction “train” pour coller le plus possible à
+# Supervised learning
+
+L’apprentissage surpervisé des machines consiste à utiliser des
+algorithmes de R qui vont pouvoir choisir des paramètres de manière
+automatique. Nous avons vu avec les analyses précedantes que l’âge des
+souris influençait les communautés. Ici, grâce aux techniques
+d’apprentissage supervisé, nous allons essayer de prédire l’âge des
+souris par rapport aux communautés microbiennes retrouvées. La première
+étape pour pouvoir faire cela sera donc de diviser les données en
+différents sets de tests avec les assignements donnés par souris (et
+non par echantillon) pour s’assurer que les différents tests simulent
+bien une collection de nouvelles données.Nous allons suivre le modèle
+“Partial Least Squares” (PLS). Une fois ces données divisées, nous
+pouvons utiliser la fonction “train” pour coller le plus possible à
 notre modèle. Ici nous commençons par charger notre librairie pour
 éviter les messages d’erreur.
 
@@ -1253,27 +1259,29 @@ ps_samp <- sample_data(ps) %>%
        value.name = "alpha_diversity")
 ```
 
-\#Hierarchical multiple testing Pour pouvoir compiler des tests
-performés sur des bactéries individuelles en exploitant en parallèle
-les structures au seins des hypothèses testées, comme par exmple dans
-notre cas qu’une espèce de Ruminococcus qui est etroitement corrélée à
-l’âge des souris, nous allons pouvoir utiliser une procédure de tests
-hierarchiques. Dans cette procédure, nous allons pouvoir tester les
-associations les plus représentées. Si nous nous trouvons dans une
-situation dans laquelle nous avons beaucoup d’espèces qui fournissent un
-signal léger, nous allons pouvoir rassembler ces informations pour
-pouvoir augmenter leur puissance. Ce test va être particulièrement
-efficace pour tester les associations entre les abondances microbiennes
-et l’âge dans le cadre de notre étude. L’avantage ici sera de pouvoir
-identifier les bactéries spécifiques responsables de ces différences
-entre les âges. Pour ce faire, nous allons ici travailler en considérant
-une stabilisation par transformation de la variance pour les données
-issues des sequences ARN 16S générées et disponibles dans le package
-DESeq2. C’est une autre méthode de normalisation qui sera plus adaptée à
-notre test. Nous obtiendrons quand meme une transformation avec des taux
-de significativité des bactéries importantes semblable aux autres
-analyses. L’histogramme nous donne le total des abondances transformées
-pour chaque échantillon.
+# Hierarchical multiple testing
+
+Pour pouvoir compiler des tests performés sur des bactéries
+individuelles en exploitant en parallèle les structures au seins des
+hypothèses testées, comme par exmple dans notre cas qu’une espèce de
+Ruminococcus qui est etroitement corrélée à l’âge des souris, nous
+allons pouvoir utiliser une procédure de tests hierarchiques. Dans cette
+procédure, nous allons pouvoir tester les associations les plus
+représentées. Si nous nous trouvons dans une situation dans laquelle
+nous avons beaucoup d’espèces qui fournissent un signal léger, nous
+allons pouvoir rassembler ces informations pour pouvoir augmenter leur
+puissance. Ce test va être particulièrement efficace pour tester les
+associations entre les abondances microbiennes et l’âge dans le cadre de
+notre étude. L’avantage ici sera de pouvoir identifier les bactéries
+spécifiques responsables de ces différences entre les âges. Pour ce
+faire, nous allons ici travailler en considérant une stabilisation par
+transformation de la variance pour les données issues des sequences ARN
+16S générées et disponibles dans le package DESeq2. C’est une autre
+méthode de normalisation qui sera plus adaptée à notre test. Nous
+obtiendrons quand meme une transformation avec des taux de
+significativité des bactéries importantes semblable aux autres analyses.
+L’histogramme nous donne le total des abondances transformées pour
+chaque échantillon.
 
 ``` r
 library("reshape2")
@@ -1419,6 +1427,13 @@ el[, 1] <- el_names[el0[, 1]]
 el[, 2] <- el_names[as.numeric(el0[, 2])]
 unadj_p <- treePValues(el, abund, sample_data(pslog)$age_binned)
 ```
+
+Ici nous devrions obtenir un arbre représentant les différences
+d’abondance parmis les bactéries obtenu grâce des procédures de test
+hierarchique. Les noeuds sont crées selon des p-values, qui representent
+les associations les plus fortes jusqu’aix plus faibles. Nous devrions
+voir que l’âge des souris est bien corrélé avec l’abondance des
+bactéries.
 
 ``` r
 hfdr_res <- hFDR.adjust(unadj_p, el, .75)
