@@ -8,6 +8,7 @@ output:
 # Préparation de l'environnement
 ## Chargement des librairies Phyloseq et Dada2 afin de pouvoir utiliser ses packages
 ```{r}
+library(ggplot2)
 library ("phyloseq")
 library("dada2")
 ```
@@ -30,7 +31,7 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 # Inspect read quality profiles
 Permet d'inspecter la qualité des différents reads et nous permet de voir à partir de quel nucléotide nous allons avoir une baisse du score de qualité pour pouvoir par la suite retirer les nucléotides de mauvaise qualité. Sur les forwards nous allons retirer les 10 derniers nucléotides avec une commande retrouvée plus bas dans le script. 
 ```{r}
-plotQualityProfile(fnRs[1:4])
+plotQualityProfile(fnFs[1:4])
 ```
 Ici nous faisons la même manipulation mais avec les Reverses qui sont d'un peu moins bonne qualité que les Forwards, dû au sequençage avec Illumina.Ici, nous retirerons tous les nucléotides à partir du 160e
 ```{r}
